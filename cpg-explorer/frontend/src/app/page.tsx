@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useTransition } from 'react';
+import { useState, useCallback, useDeferredValue, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import SearchBar from '@/components/SearchBar';
 import PackageList from '@/components/PackageList';
@@ -26,17 +26,31 @@ export default function Home() {
   const [depth, setDepth] = useState(2);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sourceOpen, setSourceOpen] = useState(true);
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const deferredGraph = useDeferredValue(graph);
+  const isStale = deferredGraph !== graph;
+
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadCallGraph = useCallback(
     async (funcId: string, direction: 'callees' | 'callers' = 'callees', depthOverride?: number) => {
+      // Отменяем предыдущий запрос
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      setIsLoading(true);
       try {
         const data = await api.getCallGraph(funcId, depthOverride ?? depth, direction);
-        startTransition(() => {
-          setGraph(data);
-        });
+        setGraph(data);
       } catch (err) {
-        console.error('Failed to load call graph:', err);
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Failed to load call graph:', err);
+        }
+      } finally {
+        setIsLoading(false);
       }
     },
     [depth]
@@ -81,9 +95,7 @@ export default function Home() {
     (mode: ViewMode) => {
       setViewMode(mode);
       if (selectedNode) {
-        startTransition(() => {
-          loadCallGraph(selectedNode.id, mode === 'callers' ? 'callers' : 'callees');
-        });
+        loadCallGraph(selectedNode.id, mode === 'callers' ? 'callers' : 'callees');
       }
     },
     [selectedNode, loadCallGraph]
@@ -93,13 +105,11 @@ export default function Home() {
     (newDepth: number) => {
       setDepth(newDepth);
       if (selectedNode) {
-        startTransition(() => {
-          loadCallGraph(
-            selectedNode.id,
-            viewMode === 'callers' ? 'callers' : 'callees',
-            newDepth
-          );
-        });
+        loadCallGraph(
+          selectedNode.id,
+          viewMode === 'callers' ? 'callers' : 'callees',
+          newDepth
+        );
       }
     },
     [selectedNode, viewMode, loadCallGraph]
@@ -197,16 +207,17 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            {graph && (
+            {deferredGraph && (
               <div className="text-sm text-gray-500">
-                {graph.nodes.length} nodes, {graph.edges.length} edges
+                {deferredGraph.nodes.length} nodes, {deferredGraph.edges.length} edges
+                {isLoading && <span className="ml-2 text-blue-400">Loading...</span>}
               </div>
             )}
           </div>
 
           {/* Graph View */}
           <div className="flex-1 overflow-hidden">
-            {!graph ? (
+            {!deferredGraph ? (
               <div className="h-full flex flex-col items-center justify-center text-gray-500">
                 <svg className="w-16 h-16 mb-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -221,11 +232,11 @@ export default function Home() {
               </div>
             ) : (
               <GraphView
-                graph={graph}
+                graph={deferredGraph}
                 selectedNodeId={selectedNode?.id}
                 onNodeClick={handleNodeClick}
                 onNodeDoubleClick={handleNodeDoubleClick}
-                loading={isPending}
+                loading={isLoading || isStale}
               />
             )}
           </div>

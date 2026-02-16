@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --border: #333;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --surface: #1a1a1a;
+  --surface-hover: #252525;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Graph container */
+.graph-container {
+  background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0a 100%);
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid var(--surface);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Code highlighting overrides */
+.syntax-highlighter {
+  background: var(--surface) !important;
+  border-radius: 8px;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.syntax-highlighter code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+}
+
+/* Highlight line */
+.highlighted-line {
+  background: rgba(59, 130, 246, 0.2);
+  display: block;
+  margin: 0 -1rem;
+  padding: 0 1rem;
+}

@@ -51,7 +51,7 @@ type SearchResult struct {
 }
 
 func Open(path string) (*DB, error) {
-	conn, err := sql.Open("sqlite3", path+"?mode=ro&cache=shared&_journal_mode=WAL")
+	conn, err := sql.Open("sqlite", path+"?mode=ro")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

@@ -1,23 +1,21 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
-
-RUN apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -o server .
+RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
 FROM alpine:3.19
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates sqlite
+RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /app/server .
 
-EXPOSE 8080
+EXPOSE 5050
 
 CMD ["./server"]

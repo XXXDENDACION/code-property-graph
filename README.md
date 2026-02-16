@@ -4,7 +4,15 @@
 
 This archive ships `cpg-gen` — a Code Property Graph (CPG) generator for Go projects. A CPG fuses the abstract syntax tree, control flow graph, data flow graph, call graph, type system, and static analysis results into a single queryable graph stored as an SQLite database.
 
-Three Go modules are included: **Prometheus**, **client_golang**, and **prometheus-adapter**. You will add a fourth module yourself (see below).
+Three Go modules are referenced as git submodules: **Prometheus**, **client_golang**, and **prometheus-adapter**. You will add a fourth module yourself (see below).
+
+## Setup
+
+```bash
+git submodule update --init
+```
+
+This fetches the three source modules from GitHub.
 
 ## Prerequisites
 

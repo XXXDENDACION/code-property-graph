@@ -124,12 +124,6 @@ export default function SourceView({ selectedNode }: SourceViewProps) {
                 <span className="font-medium text-white">{metrics.fanOut}</span>
               </div>
             )}
-            {metrics.returns > 0 && (
-              <div className="flex flex-col">
-                <span className="text-gray-500">Returns</span>
-                <span className="font-medium text-white">{metrics.returns}</span>
-              </div>
-            )}
           </div>
         </div>
       )}

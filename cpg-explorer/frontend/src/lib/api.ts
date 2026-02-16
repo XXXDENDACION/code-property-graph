@@ -54,7 +54,6 @@ export interface FunctionMetrics {
   complexity: number;
   loc: number;
   parameters: number;
-  returns: number;
   fanIn: number;
   fanOut: number;
 }

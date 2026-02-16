@@ -59,7 +59,6 @@ type FunctionMetrics struct {
 	Complexity int    `json:"complexity"`
 	LOC        int    `json:"loc"`
 	Parameters int    `json:"parameters"`
-	Returns    int    `json:"returns"`
 	FanIn      int    `json:"fanIn"`
 	FanOut     int    `json:"fanOut"`
 }
@@ -483,18 +482,17 @@ func (db *DB) GetFunctionMetrics(funcID string) (*FunctionMetrics, error) {
 			COALESCE(n.file, '') as file, COALESCE(n.line, 0) as line,
 			COALESCE(m.cyclomatic_complexity, 0) as complexity,
 			COALESCE(m.loc, 0) as loc,
-			COALESCE(m.parameters, 0) as parameters,
-			COALESCE(m.returns, 0) as returns,
+			COALESCE(m.num_params, 0) as parameters,
 			COALESCE(m.fan_in, 0) as fan_in,
 			COALESCE(m.fan_out, 0) as fan_out
 		FROM nodes n
-		LEFT JOIN metrics m ON n.id = m.node_id
+		LEFT JOIN metrics m ON n.id = m.function_id
 		WHERE n.id = ?
 	`
 	var fm FunctionMetrics
 	err := db.conn.QueryRow(query, funcID).Scan(
 		&fm.ID, &fm.Name, &fm.Package, &fm.File, &fm.Line,
-		&fm.Complexity, &fm.LOC, &fm.Parameters, &fm.Returns,
+		&fm.Complexity, &fm.LOC, &fm.Parameters,
 		&fm.FanIn, &fm.FanOut,
 	)
 	if err == sql.ErrNoRows {

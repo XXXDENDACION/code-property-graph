@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useTransition } from 'react';
 import dynamic from 'next/dynamic';
 import SearchBar from '@/components/SearchBar';
 import PackageList from '@/components/PackageList';
@@ -22,22 +22,21 @@ type ViewMode = 'callgraph' | 'callers';
 export default function Home() {
   const [graph, setGraph] = useState<Graph | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('callgraph');
   const [depth, setDepth] = useState(2);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sourceOpen, setSourceOpen] = useState(true);
+  const [isPending, startTransition] = useTransition();
 
   const loadCallGraph = useCallback(
     async (funcId: string, direction: 'callees' | 'callers' = 'callees', depthOverride?: number) => {
-      setLoading(true);
       try {
         const data = await api.getCallGraph(funcId, depthOverride ?? depth, direction);
-        setGraph(data);
+        startTransition(() => {
+          setGraph(data);
+        });
       } catch (err) {
         console.error('Failed to load call graph:', err);
-      } finally {
-        setLoading(false);
       }
     },
     [depth]
@@ -82,7 +81,9 @@ export default function Home() {
     (mode: ViewMode) => {
       setViewMode(mode);
       if (selectedNode) {
-        loadCallGraph(selectedNode.id, mode === 'callers' ? 'callers' : 'callees');
+        startTransition(() => {
+          loadCallGraph(selectedNode.id, mode === 'callers' ? 'callers' : 'callees');
+        });
       }
     },
     [selectedNode, loadCallGraph]
@@ -92,11 +93,13 @@ export default function Home() {
     (newDepth: number) => {
       setDepth(newDepth);
       if (selectedNode) {
-        loadCallGraph(
-          selectedNode.id,
-          viewMode === 'callers' ? 'callers' : 'callees',
-          newDepth
-        );
+        startTransition(() => {
+          loadCallGraph(
+            selectedNode.id,
+            viewMode === 'callers' ? 'callers' : 'callees',
+            newDepth
+          );
+        });
       }
     },
     [selectedNode, viewMode, loadCallGraph]
@@ -222,7 +225,7 @@ export default function Home() {
                 selectedNodeId={selectedNode?.id}
                 onNodeClick={handleNodeClick}
                 onNodeDoubleClick={handleNodeDoubleClick}
-                loading={loading}
+                loading={isPending}
               />
             )}
           </div>

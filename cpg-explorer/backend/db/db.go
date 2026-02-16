@@ -68,7 +68,6 @@ func (db *DB) GetPackages() ([]Package, error) {
 	query := `
 		SELECT
 			n.package,
-			COALESCE(n.module, '') as module,
 			COUNT(DISTINCT n.file) as file_count,
 			COUNT(CASE WHEN n.kind = 'function' THEN 1 END) as func_count
 		FROM nodes n
@@ -86,7 +85,7 @@ func (db *DB) GetPackages() ([]Package, error) {
 	var packages []Package
 	for rows.Next() {
 		var p Package
-		if err := rows.Scan(&p.Name, &p.Module, &p.FileCount, &p.FuncCount); err != nil {
+		if err := rows.Scan(&p.Name, &p.FileCount, &p.FuncCount); err != nil {
 			return nil, err
 		}
 		packages = append(packages, p)
@@ -96,7 +95,7 @@ func (db *DB) GetPackages() ([]Package, error) {
 
 func (db *DB) GetPackageGraph() (*Graph, error) {
 	nodesQuery := `
-		SELECT DISTINCT package, COALESCE(module, '') as module
+		SELECT DISTINCT package
 		FROM nodes
 		WHERE package != '' AND kind = 'function'
 		LIMIT 200
@@ -111,8 +110,8 @@ func (db *DB) GetPackageGraph() (*Graph, error) {
 	pkgSet := make(map[string]bool)
 
 	for rows.Next() {
-		var pkg, module string
-		if err := rows.Scan(&pkg, &module); err != nil {
+		var pkg string
+		if err := rows.Scan(&pkg); err != nil {
 			return nil, err
 		}
 		if !pkgSet[pkg] {
@@ -121,7 +120,6 @@ func (db *DB) GetPackageGraph() (*Graph, error) {
 				ID:      pkg,
 				Kind:    "package",
 				Name:    pkg,
-				Package: module,
 			})
 		}
 	}

@@ -59,6 +59,28 @@ export interface FunctionMetrics {
   fanOut: number;
 }
 
+export interface Hotspot {
+  id: string;
+  name: string;
+  package: string;
+  file: string;
+  line: number;
+  complexity: number;
+  loc: number;
+  fanIn: number;
+  fanOut: number;
+  score: number;
+}
+
+export interface Finding {
+  id: string;
+  category: string;
+  severity: string;
+  message: string;
+  file: string;
+  line: number;
+}
+
 async function fetchAPI<T>(endpoint: string): Promise<T> {
   const res = await fetch(`${API_URL}${endpoint}`);
   if (!res.ok) {
@@ -91,6 +113,15 @@ export const api = {
 
   search: (query: string, limit = 50) =>
     fetchAPI<SearchResult[]>(`/api/search?q=${encodeURIComponent(query)}&limit=${limit}`),
+
+  searchCode: (query: string, limit = 30) =>
+    fetchAPI<SearchResult[]>(`/api/search/code?q=${encodeURIComponent(query)}&limit=${limit}`),
+
+  getHotspots: (limit = 20) =>
+    fetchAPI<Hotspot[]>(`/api/hotspots?limit=${limit}`),
+
+  getFunctionFindings: (funcId: string) =>
+    fetchAPI<Finding[]>(`/api/function/findings?id=${encodeURIComponent(funcId)}`),
 
   healthCheck: () => fetchAPI<{ status: string }>('/api/health'),
 };

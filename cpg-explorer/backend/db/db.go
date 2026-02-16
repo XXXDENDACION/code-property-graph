@@ -64,6 +64,28 @@ type FunctionMetrics struct {
 	FanOut     int    `json:"fanOut"`
 }
 
+type Hotspot struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Package    string `json:"package"`
+	File       string `json:"file"`
+	Line       int    `json:"line"`
+	Complexity int    `json:"complexity"`
+	LOC        int    `json:"loc"`
+	FanIn      int    `json:"fanIn"`
+	FanOut     int    `json:"fanOut"`
+	Score      int    `json:"score"`
+}
+
+type Finding struct {
+	ID       string `json:"id"`
+	Category string `json:"category"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+	File     string `json:"file"`
+	Line     int    `json:"line"`
+}
+
 func Open(path string) (*DB, error) {
 	conn, err := sql.Open("sqlite", path+"?mode=ro")
 	if err != nil {
@@ -505,4 +527,149 @@ func (db *DB) GetStats() (map[string]int, error) {
 	}
 
 	return stats, nil
+}
+
+func (db *DB) GetHotspots(limit int) ([]Hotspot, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// Try dashboard_hotspots first (pre-computed)
+	query := `
+		SELECT
+			h.node_id, n.name, COALESCE(n.package, '') as package,
+			COALESCE(n.file, '') as file, COALESCE(n.line, 0) as line,
+			COALESCE(h.complexity, 0), COALESCE(h.loc, 0),
+			COALESCE(h.fan_in, 0), COALESCE(h.fan_out, 0),
+			COALESCE(h.score, 0)
+		FROM dashboard_hotspots h
+		JOIN nodes n ON h.node_id = n.id
+		ORDER BY h.score DESC
+		LIMIT ?
+	`
+	rows, err := db.conn.Query(query, limit)
+	if err != nil {
+		// Fallback: compute from metrics table
+		query = `
+			SELECT
+				n.id, n.name, COALESCE(n.package, '') as package,
+				COALESCE(n.file, '') as file, COALESCE(n.line, 0) as line,
+				COALESCE(m.cyclomatic_complexity, 0) as complexity,
+				COALESCE(m.loc, 0) as loc,
+				COALESCE(m.fan_in, 0) as fan_in,
+				COALESCE(m.fan_out, 0) as fan_out,
+				(COALESCE(m.cyclomatic_complexity, 0) * 2 + COALESCE(m.fan_in, 0) + COALESCE(m.fan_out, 0)) as score
+			FROM nodes n
+			JOIN metrics m ON n.id = m.node_id
+			WHERE n.kind = 'function'
+			ORDER BY score DESC
+			LIMIT ?
+		`
+		rows, err = db.conn.Query(query, limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer rows.Close()
+
+	var hotspots []Hotspot
+	for rows.Next() {
+		var h Hotspot
+		if err := rows.Scan(&h.ID, &h.Name, &h.Package, &h.File, &h.Line,
+			&h.Complexity, &h.LOC, &h.FanIn, &h.FanOut, &h.Score); err != nil {
+			return nil, err
+		}
+		hotspots = append(hotspots, h)
+	}
+	return hotspots, nil
+}
+
+func (db *DB) GetFunctionFindings(funcID string) ([]Finding, error) {
+	// Try findings table first
+	query := `
+		SELECT
+			f.id, f.category, COALESCE(f.severity, 'info') as severity,
+			COALESCE(f.message, '') as message,
+			COALESCE(n.file, '') as file, COALESCE(n.line, 0) as line
+		FROM findings f
+		JOIN nodes n ON f.node_id = n.id
+		WHERE f.node_id = ?
+		ORDER BY
+			CASE f.severity
+				WHEN 'critical' THEN 0
+				WHEN 'high' THEN 1
+				WHEN 'medium' THEN 2
+				WHEN 'low' THEN 3
+				ELSE 4
+			END
+	`
+	rows, err := db.conn.Query(query, funcID)
+	if err != nil {
+		// Table might not exist, return empty
+		return []Finding{}, nil
+	}
+	defer rows.Close()
+
+	var findings []Finding
+	for rows.Next() {
+		var f Finding
+		if err := rows.Scan(&f.ID, &f.Category, &f.Severity, &f.Message, &f.File, &f.Line); err != nil {
+			return nil, err
+		}
+		findings = append(findings, f)
+	}
+	return findings, nil
+}
+
+func (db *DB) SearchCode(query string, limit int) ([]SearchResult, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+
+	// Use FTS5 full-text search on sources
+	sqlQuery := `
+		SELECT
+			n.id, n.kind, n.name,
+			COALESCE(n.package, '') as package,
+			COALESCE(n.file, '') as file,
+			COALESCE(n.line, 0) as line
+		FROM sources_fts fts
+		JOIN nodes n ON fts.file = n.file
+		WHERE sources_fts MATCH ?
+			AND n.kind = 'function'
+		GROUP BY n.id
+		LIMIT ?
+	`
+	rows, err := db.conn.Query(sqlQuery, query, limit)
+	if err != nil {
+		// FTS might not be available, fallback to LIKE search
+		sqlQuery = `
+			SELECT
+				n.id, n.kind, n.name,
+				COALESCE(n.package, '') as package,
+				COALESCE(n.file, '') as file,
+				COALESCE(n.line, 0) as line
+			FROM sources s
+			JOIN nodes n ON s.file = n.file
+			WHERE s.content LIKE ?
+				AND n.kind = 'function'
+			GROUP BY n.id
+			LIMIT ?
+		`
+		rows, err = db.conn.Query(sqlQuery, "%"+query+"%", limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer rows.Close()
+
+	var results []SearchResult
+	for rows.Next() {
+		var r SearchResult
+		if err := rows.Scan(&r.ID, &r.Kind, &r.Name, &r.Package, &r.File, &r.Line); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
 }

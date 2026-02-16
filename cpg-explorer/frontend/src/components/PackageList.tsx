@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api, Package, Node } from '@/lib/api';
+import HotspotsPanel from './HotspotsPanel';
 
 interface PackageListProps {
   onFunctionSelect: (func: Node) => void;
@@ -63,6 +64,9 @@ export default function PackageList({ onFunctionSelect }: PackageListProps) {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Hotspots Panel */}
+      <HotspotsPanel onFunctionSelect={onFunctionSelect} />
+
       <div className="flex-shrink-0 p-3 border-b border-gray-800">
         <input
           type="text"

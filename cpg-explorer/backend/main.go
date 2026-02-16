@@ -43,8 +43,11 @@ func main() {
 	api.HandleFunc("/callgraph", h.GetCallGraph).Methods("GET")
 	api.HandleFunc("/function/source", h.GetSource).Methods("GET")
 	api.HandleFunc("/function/metrics", h.GetFunctionMetrics).Methods("GET")
+	api.HandleFunc("/function/findings", h.GetFunctionFindings).Methods("GET")
 	api.HandleFunc("/source", h.GetSourceByFile).Methods("GET")
 	api.HandleFunc("/search", h.Search).Methods("GET")
+	api.HandleFunc("/search/code", h.SearchCode).Methods("GET")
+	api.HandleFunc("/hotspots", h.GetHotspots).Methods("GET")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

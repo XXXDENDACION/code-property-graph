@@ -173,3 +173,56 @@ func (h *Handler) GetFunctionMetrics(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, map[string]string{"status": "ok"})
 }
+
+func (h *Handler) GetHotspots(w http.ResponseWriter, r *http.Request) {
+	limit := 20
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+
+	hotspots, err := h.db.GetHotspots(limit)
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.respondJSON(w, hotspots)
+}
+
+func (h *Handler) GetFunctionFindings(w http.ResponseWriter, r *http.Request) {
+	funcID := r.URL.Query().Get("id")
+	if funcID == "" {
+		h.respondError(w, http.StatusBadRequest, "id parameter required")
+		return
+	}
+
+	findings, err := h.db.GetFunctionFindings(funcID)
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.respondJSON(w, findings)
+}
+
+func (h *Handler) SearchCode(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		h.respondJSON(w, []db.SearchResult{})
+		return
+	}
+
+	limit := 30
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+
+	results, err := h.db.SearchCode(query, limit)
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.respondJSON(w, results)
+}

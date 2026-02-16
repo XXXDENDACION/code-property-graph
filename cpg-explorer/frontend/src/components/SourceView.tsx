@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { api, Node, FunctionMetrics } from '@/lib/api';
+import { api, Node, FunctionMetrics, Finding } from '@/lib/api';
 
 interface SourceViewProps {
   selectedNode: Node | null;
@@ -12,6 +12,7 @@ interface SourceViewProps {
 export default function SourceView({ selectedNode }: SourceViewProps) {
   const [source, setSource] = useState<string>('');
   const [metrics, setMetrics] = useState<FunctionMetrics | null>(null);
+  const [findings, setFindings] = useState<Finding[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +20,7 @@ export default function SourceView({ selectedNode }: SourceViewProps) {
     if (!selectedNode) {
       setSource('');
       setMetrics(null);
+      setFindings([]);
       return;
     }
 
@@ -27,9 +29,10 @@ export default function SourceView({ selectedNode }: SourceViewProps) {
       setError(null);
 
       try {
-        const [sourceResult, metricsResult] = await Promise.allSettled([
+        const [sourceResult, metricsResult, findingsResult] = await Promise.allSettled([
           selectedNode.file ? api.getSourceByFile(selectedNode.file) : Promise.resolve({ source: '' }),
           api.getFunctionMetrics(selectedNode.id),
+          api.getFunctionFindings(selectedNode.id),
         ]);
 
         if (sourceResult.status === 'fulfilled') {
@@ -37,6 +40,9 @@ export default function SourceView({ selectedNode }: SourceViewProps) {
         }
         if (metricsResult.status === 'fulfilled') {
           setMetrics(metricsResult.value);
+        }
+        if (findingsResult.status === 'fulfilled') {
+          setFindings(findingsResult.value || []);
         }
       } catch (err) {
         setError('Failed to load data');
@@ -124,6 +130,41 @@ export default function SourceView({ selectedNode }: SourceViewProps) {
                 <span className="font-medium text-white">{metrics.returns}</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Findings */}
+      {findings.length > 0 && (
+        <div className="flex-shrink-0 p-3 border-b border-gray-800 bg-gray-900/30">
+          <div className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Findings ({findings.length})
+          </div>
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {findings.map((finding) => (
+              <div
+                key={finding.id}
+                className={`text-xs px-2 py-1.5 rounded border ${
+                  finding.severity === 'critical' || finding.severity === 'high'
+                    ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                    : finding.severity === 'medium'
+                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+                    : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium capitalize">{finding.category}</span>
+                  <span className="text-[10px] uppercase opacity-70">{finding.severity}</span>
+                </div>
+                {finding.message && (
+                  <p className="opacity-80 mt-0.5">{finding.message}</p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

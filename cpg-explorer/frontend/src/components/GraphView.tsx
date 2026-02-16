@@ -95,7 +95,9 @@ export default function GraphView({
 }: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const initTimeoutRef = useRef<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const handleZoomIn = useCallback(() => {
     if (cyRef.current) {
@@ -130,155 +132,176 @@ export default function GraphView({
   const initGraph = useCallback(() => {
     if (!containerRef.current || !graph) return;
 
-    if (cyRef.current) {
-      cyRef.current.destroy();
+    // Cancel any pending initialization
+    if (initTimeoutRef.current) {
+      cancelAnimationFrame(initTimeoutRef.current);
     }
 
-    // Create a set of node IDs for fast lookup
-    const nodeIds = new Set(graph.nodes.map((n) => n.id));
+    // Destroy existing graph immediately to free memory
+    if (cyRef.current) {
+      cyRef.current.destroy();
+      cyRef.current = null;
+    }
 
-    // Filter edges to only include those where both source and target exist
-    const validEdges = graph.edges.filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
-    );
+    setIsInitializing(true);
 
-    const elements = [
-      ...graph.nodes.map((node) => ({
-        data: {
-          id: node.id,
-          label: node.name,
-          kind: node.kind,
-          pkg: node.package,
-          file: node.file,
-          line: node.line,
-          typeInfo: node.typeInfo,
-        },
-      })),
-      ...validEdges.map((edge, i) => ({
-        data: {
-          id: `edge-${i}`,
-          source: edge.source,
-          target: edge.target,
-          kind: edge.kind,
-        },
-      })),
-    ];
-
-    cyRef.current = cytoscape({
-      container: containerRef.current,
-      elements,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': (ele: NodeSingular) => getNodeColor(ele.data('kind')),
-            'label': 'data(label)',
-            'color': '#fff',
-            'text-valign': 'bottom',
-            'text-halign': 'center',
-            'font-size': 11,
-            'text-margin-y': 6,
-            'text-background-color': '#0a0a0a',
-            'text-background-opacity': 0.8,
-            'text-background-padding': 3,
-            'width': 40,
-            'height': 40,
-            'border-width': 2,
-            'border-color': '#333',
-          },
-        },
-        {
-          selector: 'node:hover',
-          style: {
-            'border-color': '#fff',
-            'border-width': 3,
-            'width': 45,
-            'height': 45,
-          },
-        },
-        {
-          selector: 'node.selected',
-          style: {
-            'border-color': '#f59e0b',
-            'border-width': 4,
-            'width': 50,
-            'height': 50,
-          },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'width': 2,
-            'line-color': '#444',
-            'target-arrow-color': '#444',
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-            'arrow-scale': 1.2,
-            'opacity': 0.7,
-          },
-        },
-        {
-          selector: 'edge:hover',
-          style: {
-            'line-color': '#666',
-            'target-arrow-color': '#666',
-            'opacity': 1,
-          },
-        },
-      ] as StylesheetStyle[],
-      layout: {
-        name: layoutType,
-        ...(layoutType === 'dagre' && {
-          rankDir: 'TB',
-          nodeSep: 60,
-          rankSep: 80,
-          padding: 30,
-        }),
-        ...(layoutType === 'cose' && {
-          nodeRepulsion: 8000,
-          idealEdgeLength: 100,
-          padding: 30,
-        }),
-        ...(layoutType === 'breadthfirst' && {
-          directed: true,
-          padding: 30,
-          spacingFactor: 1.5,
-        }),
-      } as cytoscape.LayoutOptions,
-      minZoom: 0.2,
-      maxZoom: 3,
-      wheelSensitivity: 0.3,
-    });
-
-    cyRef.current.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      if (onNodeClick) {
-        onNodeClick(node.data() as Node);
+    // Defer heavy Cytoscape initialization to next frame to keep UI responsive
+    initTimeoutRef.current = requestAnimationFrame(() => {
+      if (!containerRef.current || !graph) {
+        setIsInitializing(false);
+        return;
       }
-      cyRef.current?.nodes().removeClass('selected');
-      node.addClass('selected');
-    });
 
-    cyRef.current.on('dbltap', 'node', (evt) => {
-      const node = evt.target;
-      if (onNodeDoubleClick) {
-        onNodeDoubleClick(node.data() as Node);
-      }
-    });
+      // Create a set of node IDs for fast lookup
+      const nodeIds = new Set(graph.nodes.map((n) => n.id));
 
-    cyRef.current.on('zoom', () => {
-      if (cyRef.current) {
-        setZoomLevel(cyRef.current.zoom());
-      }
-    });
+      // Filter edges to only include those where both source and target exist
+      const validEdges = graph.edges.filter(
+        (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+      );
 
-    cyRef.current.fit(undefined, 50);
-    setZoomLevel(cyRef.current.zoom());
+      const elements = [
+        ...graph.nodes.map((node) => ({
+          data: {
+            id: node.id,
+            label: node.name,
+            kind: node.kind,
+            pkg: node.package,
+            file: node.file,
+            line: node.line,
+            typeInfo: node.typeInfo,
+          },
+        })),
+        ...validEdges.map((edge, i) => ({
+          data: {
+            id: `edge-${i}`,
+            source: edge.source,
+            target: edge.target,
+            kind: edge.kind,
+          },
+        })),
+      ];
+
+      cyRef.current = cytoscape({
+        container: containerRef.current,
+        elements,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'background-color': (ele: NodeSingular) => getNodeColor(ele.data('kind')),
+              'label': 'data(label)',
+              'color': '#fff',
+              'text-valign': 'bottom',
+              'text-halign': 'center',
+              'font-size': 11,
+              'text-margin-y': 6,
+              'text-background-color': '#0a0a0a',
+              'text-background-opacity': 0.8,
+              'text-background-padding': 3,
+              'width': 40,
+              'height': 40,
+              'border-width': 2,
+              'border-color': '#333',
+            },
+          },
+          {
+            selector: 'node:hover',
+            style: {
+              'border-color': '#fff',
+              'border-width': 3,
+              'width': 45,
+              'height': 45,
+            },
+          },
+          {
+            selector: 'node.selected',
+            style: {
+              'border-color': '#f59e0b',
+              'border-width': 4,
+              'width': 50,
+              'height': 50,
+            },
+          },
+          {
+            selector: 'edge',
+            style: {
+              'width': 2,
+              'line-color': '#444',
+              'target-arrow-color': '#444',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier',
+              'arrow-scale': 1.2,
+              'opacity': 0.7,
+            },
+          },
+          {
+            selector: 'edge:hover',
+            style: {
+              'line-color': '#666',
+              'target-arrow-color': '#666',
+              'opacity': 1,
+            },
+          },
+        ] as StylesheetStyle[],
+        layout: {
+          name: layoutType,
+          ...(layoutType === 'dagre' && {
+            rankDir: 'TB',
+            nodeSep: 60,
+            rankSep: 80,
+            padding: 30,
+          }),
+          ...(layoutType === 'cose' && {
+            nodeRepulsion: 8000,
+            idealEdgeLength: 100,
+            padding: 30,
+          }),
+          ...(layoutType === 'breadthfirst' && {
+            directed: true,
+            padding: 30,
+            spacingFactor: 1.5,
+          }),
+        } as cytoscape.LayoutOptions,
+        minZoom: 0.2,
+        maxZoom: 3,
+        wheelSensitivity: 0.3,
+      });
+
+      cyRef.current.on('tap', 'node', (evt) => {
+        const node = evt.target;
+        if (onNodeClick) {
+          onNodeClick(node.data() as Node);
+        }
+        cyRef.current?.nodes().removeClass('selected');
+        node.addClass('selected');
+      });
+
+      cyRef.current.on('dbltap', 'node', (evt) => {
+        const node = evt.target;
+        if (onNodeDoubleClick) {
+          onNodeDoubleClick(node.data() as Node);
+        }
+      });
+
+      cyRef.current.on('zoom', () => {
+        if (cyRef.current) {
+          setZoomLevel(cyRef.current.zoom());
+        }
+      });
+
+      cyRef.current.fit(undefined, 50);
+      setZoomLevel(cyRef.current.zoom());
+      setIsInitializing(false);
+    });
   }, [graph, layoutType, onNodeClick, onNodeDoubleClick]);
 
   useEffect(() => {
     initGraph();
     return () => {
+      if (initTimeoutRef.current) {
+        cancelAnimationFrame(initTimeoutRef.current);
+      }
       if (cyRef.current) {
         cyRef.current.destroy();
       }
@@ -305,7 +328,7 @@ export default function GraphView({
         ref={containerRef}
         className="w-full h-full graph-container"
       />
-      {loading && (
+      {(loading || isInitializing) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
           <div className="spinner" />
         </div>

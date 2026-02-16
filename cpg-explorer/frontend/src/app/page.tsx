@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useDeferredValue, useRef } from 'react';
+import { useState, useCallback, useDeferredValue, useRef, useTransition } from 'react';
 import dynamic from 'next/dynamic';
 import SearchBar from '@/components/SearchBar';
 import PackageList from '@/components/PackageList';
@@ -34,6 +34,7 @@ export default function Home() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const { showToast } = useToast();
+  const [isPending, startTransition] = useTransition();
 
   const loadCallGraph = useCallback(
     async (funcId: string, direction: 'callees' | 'callers' = 'callees', depthOverride?: number) => {
@@ -46,7 +47,10 @@ export default function Home() {
       setIsLoading(true);
       try {
         const data = await api.getCallGraph(funcId, depthOverride ?? depth, direction);
-        setGraph(data);
+        // Use startTransition to keep UI responsive during heavy graph updates
+        startTransition(() => {
+          setGraph(data);
+        });
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error('Failed to load call graph:', err);
@@ -239,7 +243,7 @@ export default function Home() {
                 selectedNodeId={selectedNode?.id}
                 onNodeClick={handleNodeClick}
                 onNodeDoubleClick={handleNodeDoubleClick}
-                loading={isLoading || isStale}
+                loading={isLoading || isStale || isPending}
               />
             )}
           </div>

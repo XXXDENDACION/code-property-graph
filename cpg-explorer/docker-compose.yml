@@ -6,15 +6,15 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "5050:5050"
     environment:
       - CPG_DB_PATH=/data/cpg.db
-      - PORT=8080
+      - PORT=5050
     volumes:
       - ./data:/data:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5050/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -24,7 +24,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8080
+        - NEXT_PUBLIC_API_URL=http://localhost:5050
     ports:
       - "3000:3000"
     depends_on:

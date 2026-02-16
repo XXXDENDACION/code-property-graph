@@ -558,7 +558,7 @@ func (db *DB) GetHotspots(limit int) ([]Hotspot, error) {
 				COALESCE(m.fan_out, 0) as fan_out,
 				(COALESCE(m.cyclomatic_complexity, 0) * 2 + COALESCE(m.fan_in, 0) + COALESCE(m.fan_out, 0)) as score
 			FROM nodes n
-			JOIN metrics m ON n.id = m.node_id
+			JOIN metrics m ON n.id = m.function_id
 			WHERE n.kind = 'function'
 			ORDER BY score DESC
 			LIMIT ?

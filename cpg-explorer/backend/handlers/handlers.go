@@ -60,8 +60,11 @@ func (h *Handler) GetPackageFunctions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetCallGraph(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	funcID := vars["id"]
+	funcID := r.URL.Query().Get("id")
+	if funcID == "" {
+		h.respondError(w, http.StatusBadRequest, "id parameter required")
+		return
+	}
 
 	depth := 2
 	if d := r.URL.Query().Get("depth"); d != "" {
@@ -88,8 +91,11 @@ func (h *Handler) GetCallGraph(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetSource(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	funcID := vars["id"]
+	funcID := r.URL.Query().Get("id")
+	if funcID == "" {
+		h.respondError(w, http.StatusBadRequest, "id parameter required")
+		return
+	}
 
 	source, err := h.db.GetSource(funcID)
 	if err != nil {

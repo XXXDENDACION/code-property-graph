@@ -40,8 +40,8 @@ func main() {
 	api.HandleFunc("/packages", h.GetPackages).Methods("GET")
 	api.HandleFunc("/packages/graph", h.GetPackageGraph).Methods("GET")
 	api.HandleFunc("/packages/{name}/functions", h.GetPackageFunctions).Methods("GET")
-	api.HandleFunc("/functions/{id}/callgraph", h.GetCallGraph).Methods("GET")
-	api.HandleFunc("/functions/{id}/source", h.GetSource).Methods("GET")
+	api.HandleFunc("/callgraph", h.GetCallGraph).Methods("GET")
+	api.HandleFunc("/function/source", h.GetSource).Methods("GET")
 	api.HandleFunc("/source", h.GetSourceByFile).Methods("GET")
 	api.HandleFunc("/search", h.Search).Methods("GET")
 

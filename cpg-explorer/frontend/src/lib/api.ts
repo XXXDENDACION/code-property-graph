@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050';
 
 export interface Node {
   id: string;
@@ -64,10 +64,10 @@ export const api = {
     fetchAPI<Node[]>(`/api/packages/${encodeURIComponent(pkg)}/functions`),
 
   getCallGraph: (funcId: string, depth = 2, direction: 'callees' | 'callers' = 'callees') =>
-    fetchAPI<Graph>(`/api/functions/${encodeURIComponent(funcId)}/callgraph?depth=${depth}&direction=${direction}`),
+    fetchAPI<Graph>(`/api/callgraph?id=${encodeURIComponent(funcId)}&depth=${depth}&direction=${direction}`),
 
   getSource: (funcId: string) =>
-    fetchAPI<{ source: string }>(`/api/functions/${encodeURIComponent(funcId)}/source`),
+    fetchAPI<{ source: string }>(`/api/function/source?id=${encodeURIComponent(funcId)}`),
 
   getSourceByFile: (file: string) =>
     fetchAPI<{ source: string; file: string }>(`/api/source?file=${encodeURIComponent(file)}`),

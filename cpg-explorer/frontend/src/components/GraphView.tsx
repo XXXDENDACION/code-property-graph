@@ -212,20 +212,6 @@ export default function GraphView({
           No nodes to display
         </div>
       )}
-      <div className="absolute bottom-4 left-4 flex gap-2 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-blue-500" /> Function
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-purple-500" /> Method
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-green-500" /> Type
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-amber-500" /> Package
-        </span>
-      </div>
     </div>
   );
 }

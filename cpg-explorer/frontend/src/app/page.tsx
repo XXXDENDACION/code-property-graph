@@ -29,10 +29,10 @@ export default function Home() {
   const [sourceOpen, setSourceOpen] = useState(true);
 
   const loadCallGraph = useCallback(
-    async (funcId: string, direction: 'callees' | 'callers' = 'callees') => {
+    async (funcId: string, direction: 'callees' | 'callers' = 'callees', depthOverride?: number) => {
       setLoading(true);
       try {
-        const data = await api.getCallGraph(funcId, depth, direction);
+        const data = await api.getCallGraph(funcId, depthOverride ?? depth, direction);
         setGraph(data);
       } catch (err) {
         console.error('Failed to load call graph:', err);
@@ -92,12 +92,11 @@ export default function Home() {
     (newDepth: number) => {
       setDepth(newDepth);
       if (selectedNode) {
-        setTimeout(() => {
-          loadCallGraph(
-            selectedNode.id,
-            viewMode === 'callers' ? 'callers' : 'callees'
-          );
-        }, 0);
+        loadCallGraph(
+          selectedNode.id,
+          viewMode === 'callers' ? 'callers' : 'callees',
+          newDepth
+        );
       }
     },
     [selectedNode, viewMode, loadCallGraph]

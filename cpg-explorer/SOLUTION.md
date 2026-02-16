@@ -2,7 +2,7 @@
 
 ## Overview
 
-CPG Explorer is a web-based IDE for exploring Go codebases through their Code Property Graph. The application provides an interactive graph visualization focused on **Call Graph exploration**, allowing developers to understand function relationships, trace call chains, and view source code.
+CPG Explorer is a web-based IDE for exploring Go codebases through their Code Property Graph. The application provides an interactive graph visualization focused on **Call Graph exploration**, allowing developers to understand function relationships, trace call chains, and view source code with metrics and findings.
 
 ## Architecture
 
@@ -25,7 +25,8 @@ CPG Explorer is a web-based IDE for exploring Go codebases through their Code Pr
 │  │              Next.js Frontend (:3000)                │    │
 │  │  ┌──────────┐  ┌──────────────┐  ┌─────────────┐    │    │
 │  │  │ Sidebar  │  │  GraphView   │  │ SourceView  │    │    │
-│  │  │ Packages │  │ (Cytoscape)  │  │  (Prism)    │    │    │
+│  │  │ Hotspots │  │ (Cytoscape)  │  │  Metrics    │    │    │
+│  │  │ Packages │  │ Zoom Controls│  │  Findings   │    │    │
 │  │  └──────────┘  └──────────────┘  └─────────────┘    │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
@@ -33,7 +34,7 @@ CPG Explorer is a web-based IDE for exploring Go codebases through their Code Pr
                               │ HTTP/JSON
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Go Backend (:8080)                         │
+│                   Go Backend (:5050)                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │  Handlers   │──│   Queries   │──│  SQLite (cpg.db)    │  │
 │  │  REST API   │  │   BFS/DFS   │  │  ~900MB, read-only  │  │
@@ -49,26 +50,47 @@ CPG Explorer is a web-based IDE for exploring Go codebases through their Code Pr
 - **Bidirectional Navigation**: View both callees (what this function calls) and callers (what calls this function)
 - **Interactive Nodes**: Click to select, double-click to navigate into a function's neighborhood
 - **Focused Subgraphs**: Limited to 60 nodes per view for performance and readability
+- **Zoom Controls**: Zoom in/out buttons, fit-to-view, center graph, zoom level percentage indicator
 
-### 2. Package Browser
+### 2. Hotspots Panel (Schema Exploration)
+
+- **Top Problematic Functions**: Ranked by score = complexity×2 + fan_in + fan_out
+- **Color-Coded Severity**: Visual indicators for high-complexity functions
+- **Quick Navigation**: Click any hotspot to explore its call graph
+- Uses `dashboard_hotspots` table or computes from `metrics` table as fallback
+
+### 3. Function Metrics & Findings
+
+- **Metrics Display**: Cyclomatic complexity (color-coded), LOC, parameters, fan-in, fan-out
+- **Findings Integration**: Shows warnings/issues from `findings` table
+- **Severity Badges**: Critical/High (red), Medium (orange), Low (yellow)
+
+### 4. Package Browser
 
 - Hierarchical list of all packages in the codebase
 - Expandable to show functions within each package
 - Quick filter for package search
 - Shows function count per package
 
-### 3. Source Code Viewer
+### 5. Source Code Viewer
 
 - Syntax-highlighted Go code (via Prism)
 - Line highlighting for selected function
 - File path and line number display
 - Integrated with graph selection
 
-### 4. Global Search
+### 6. Global Search
 
 - Fuzzy search across functions, methods, and types
+- Full-text code search using FTS5
 - Real-time results with debouncing
 - Direct navigation to search results
+
+### 7. UI/UX Enhancements
+
+- **Toast Notifications**: Error feedback with auto-dismiss
+- **Loading States**: Spinners during data fetch and graph initialization
+- **Performance Optimization**: useDeferredValue, startTransition, requestAnimationFrame for smooth UI
 
 ## Design Decisions
 
@@ -110,18 +132,22 @@ The CPG contains ~555K nodes. Rendering everything is impossible. BFS with confi
 | `GET /api/packages` | List all packages |
 | `GET /api/packages/graph` | Package dependency graph |
 | `GET /api/packages/:name/functions` | Functions in a package |
-| `GET /api/functions/:id/callgraph?depth=N&direction=callees\|callers` | Call graph |
-| `GET /api/functions/:id/source` | Source code for function |
+| `GET /api/callgraph?id=X&depth=N&direction=callees\|callers` | Call graph for function |
+| `GET /api/function/source?id=X` | Source code for function |
+| `GET /api/function/metrics?id=X` | Metrics for function |
+| `GET /api/function/findings?id=X` | Findings for function |
 | `GET /api/source?file=path` | Source code by file path |
 | `GET /api/search?q=term` | Search functions/types |
+| `GET /api/search/code?q=term` | Full-text search in code |
+| `GET /api/hotspots?limit=N` | Top N problematic functions |
 | `GET /api/health` | Health check |
 
 ## Performance Considerations
 
 1. **Database Optimization**
    - Read-only mode with shared cache
-   - WAL mode for concurrent reads
    - Connection pooling (10 connections)
+   - Fallback queries when pre-computed tables unavailable
 
 2. **Query Optimization**
    - Indexed lookups by ID
@@ -130,8 +156,23 @@ The CPG contains ~555K nodes. Rendering everything is impossible. BFS with confi
 
 3. **Frontend Optimization**
    - Dynamic import for Cytoscape (code splitting)
+   - `useDeferredValue` for non-blocking graph updates
+   - `startTransition` for responsive filter changes
+   - `requestAnimationFrame` for deferred graph initialization
    - Debounced search (300ms)
-   - Minimal re-renders with useCallback
+   - AbortController for request cancellation
+
+## Schema Tables Used
+
+| Table | Usage |
+|-------|-------|
+| `nodes` | All graph nodes (functions, types, etc.) |
+| `edges` | Call relationships between nodes |
+| `sources` | Source file contents |
+| `metrics` | Function complexity metrics |
+| `findings` | Static analysis findings |
+| `dashboard_hotspots` | Pre-computed hotspot rankings |
+| `sources_fts` | Full-text search index |
 
 ## Future Improvements
 
@@ -147,7 +188,7 @@ With more time, I would add:
 ## Running the Application
 
 ```bash
-# 1. Generate the CPG database
+# 1. Generate the CPG database (place in cpg-explorer/data/cpg.db)
 ./cpg-gen ./prometheus cpg-explorer/data/cpg.db \
   -modules ./client_golang:github.com/prometheus/client_golang:client_golang,\
 ./prometheus-adapter:sigs.k8s.io/prometheus-adapter:adapter
@@ -161,11 +202,11 @@ docker compose up --build
 
 ## Evaluation Criteria Coverage
 
-| Criterion | Implementation |
-|-----------|---------------|
-| **Graph work (25%)** | Cytoscape.js with dagre layout, interactive nodes, zoom/pan, legend |
-| **Developer utility (20%)** | Call graph exploration, source view, package browser, search |
-| **Engineering quality (20%)** | Clean separation: API/DB/Handlers in Go, Components/Lib in React |
-| **Performance (15%)** | 60-node limit, connection pooling, debouncing, lazy loading |
-| **Schema exploration (10%)** | Uses nodes, edges, sources tables; call edges for graph |
-| **UI/UX (10%)** | Dark theme, loading states, error handling, responsive panels |
+| Criterion | Weight | Implementation |
+|-----------|--------|---------------|
+| **Graph work** | 25% | Cytoscape.js with dagre layout, interactive nodes, zoom controls, node navigation |
+| **Developer utility** | 20% | Call graph exploration, source view, metrics, findings, hotspots, package browser |
+| **Engineering quality** | 20% | Clean separation: API/DB/Handlers in Go, Components/Lib in React, TypeScript |
+| **Performance** | 15% | 60-node limit, useDeferredValue, startTransition, requestAnimationFrame, connection pooling |
+| **Schema exploration** | 10% | Uses nodes, edges, sources, metrics, findings, dashboard_hotspots, sources_fts |
+| **UI/UX** | 10% | Dark theme, loading states, toast notifications, responsive panels, zoom controls |

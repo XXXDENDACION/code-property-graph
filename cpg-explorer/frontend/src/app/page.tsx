@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback, useDeferredValue, useEffect, useRef } from 'react';
+import { useState, useCallback, useDeferredValue, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import SearchBar from '@/components/SearchBar';
 import PackageList from '@/components/PackageList';
 import SourceView from '@/components/SourceView';
 import StatsBar from '@/components/StatsBar';
+import { useToast } from '@/components/Toast';
 import { api, Graph, Node, SearchResult } from '@/lib/api';
 
 const GraphView = dynamic(() => import('@/components/GraphView'), {
@@ -32,6 +33,7 @@ export default function Home() {
   const isStale = deferredGraph !== graph;
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { showToast } = useToast();
 
   const loadCallGraph = useCallback(
     async (funcId: string, direction: 'callees' | 'callers' = 'callees', depthOverride?: number) => {
@@ -48,12 +50,13 @@ export default function Home() {
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error('Failed to load call graph:', err);
+          showToast('Failed to load call graph', 'error');
         }
       } finally {
         setIsLoading(false);
       }
     },
-    [depth]
+    [depth, showToast]
   );
 
   const handleFunctionSelect = useCallback(

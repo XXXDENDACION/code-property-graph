@@ -50,6 +50,20 @@ type SearchResult struct {
 	Line    int    `json:"line,omitempty"`
 }
 
+type FunctionMetrics struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Package    string `json:"package"`
+	File       string `json:"file"`
+	Line       int    `json:"line"`
+	Complexity int    `json:"complexity"`
+	LOC        int    `json:"loc"`
+	Parameters int    `json:"parameters"`
+	Returns    int    `json:"returns"`
+	FanIn      int    `json:"fanIn"`
+	FanOut     int    `json:"fanOut"`
+}
+
 func Open(path string) (*DB, error) {
 	conn, err := sql.Open("sqlite", path+"?mode=ro")
 	if err != nil {
@@ -438,6 +452,36 @@ func (db *DB) Search(query string, limit int) ([]SearchResult, error) {
 		results = append(results, r)
 	}
 	return results, nil
+}
+
+func (db *DB) GetFunctionMetrics(funcID string) (*FunctionMetrics, error) {
+	query := `
+		SELECT
+			n.id, n.name, COALESCE(n.package, '') as package,
+			COALESCE(n.file, '') as file, COALESCE(n.line, 0) as line,
+			COALESCE(m.cyclomatic_complexity, 0) as complexity,
+			COALESCE(m.loc, 0) as loc,
+			COALESCE(m.parameters, 0) as parameters,
+			COALESCE(m.returns, 0) as returns,
+			COALESCE(m.fan_in, 0) as fan_in,
+			COALESCE(m.fan_out, 0) as fan_out
+		FROM nodes n
+		LEFT JOIN metrics m ON n.id = m.node_id
+		WHERE n.id = ?
+	`
+	var fm FunctionMetrics
+	err := db.conn.QueryRow(query, funcID).Scan(
+		&fm.ID, &fm.Name, &fm.Package, &fm.File, &fm.Line,
+		&fm.Complexity, &fm.LOC, &fm.Parameters, &fm.Returns,
+		&fm.FanIn, &fm.FanOut,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &fm, nil
 }
 
 func (db *DB) GetStats() (map[string]int, error) {

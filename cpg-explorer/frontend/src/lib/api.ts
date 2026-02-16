@@ -45,6 +45,20 @@ export interface Stats {
   totalFiles: number;
 }
 
+export interface FunctionMetrics {
+  id: string;
+  name: string;
+  package: string;
+  file: string;
+  line: number;
+  complexity: number;
+  loc: number;
+  parameters: number;
+  returns: number;
+  fanIn: number;
+  fanOut: number;
+}
+
 async function fetchAPI<T>(endpoint: string): Promise<T> {
   const res = await fetch(`${API_URL}${endpoint}`);
   if (!res.ok) {
@@ -68,6 +82,9 @@ export const api = {
 
   getSource: (funcId: string) =>
     fetchAPI<{ source: string }>(`/api/function/source?id=${encodeURIComponent(funcId)}`),
+
+  getFunctionMetrics: (funcId: string) =>
+    fetchAPI<FunctionMetrics>(`/api/function/metrics?id=${encodeURIComponent(funcId)}`),
 
   getSourceByFile: (file: string) =>
     fetchAPI<{ source: string; file: string }>(`/api/source?file=${encodeURIComponent(file)}`),

@@ -42,6 +42,7 @@ func main() {
 	api.HandleFunc("/packages/{name}/functions", h.GetPackageFunctions).Methods("GET")
 	api.HandleFunc("/callgraph", h.GetCallGraph).Methods("GET")
 	api.HandleFunc("/function/source", h.GetSource).Methods("GET")
+	api.HandleFunc("/function/metrics", h.GetFunctionMetrics).Methods("GET")
 	api.HandleFunc("/source", h.GetSourceByFile).Methods("GET")
 	api.HandleFunc("/search", h.Search).Methods("GET")
 

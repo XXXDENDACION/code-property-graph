@@ -151,6 +151,25 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, stats)
 }
 
+func (h *Handler) GetFunctionMetrics(w http.ResponseWriter, r *http.Request) {
+	funcID := r.URL.Query().Get("id")
+	if funcID == "" {
+		h.respondError(w, http.StatusBadRequest, "id parameter required")
+		return
+	}
+
+	metrics, err := h.db.GetFunctionMetrics(funcID)
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if metrics == nil {
+		h.respondError(w, http.StatusNotFound, "function not found")
+		return
+	}
+	h.respondJSON(w, metrics)
+}
+
 func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, map[string]string{"status": "ok"})
 }

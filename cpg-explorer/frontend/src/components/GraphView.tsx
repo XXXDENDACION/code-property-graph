@@ -134,6 +134,14 @@ export default function GraphView({
       cyRef.current.destroy();
     }
 
+    // Create a set of node IDs for fast lookup
+    const nodeIds = new Set(graph.nodes.map((n) => n.id));
+
+    // Filter edges to only include those where both source and target exist
+    const validEdges = graph.edges.filter(
+      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+    );
+
     const elements = [
       ...graph.nodes.map((node) => ({
         data: {
@@ -146,7 +154,7 @@ export default function GraphView({
           typeInfo: node.typeInfo,
         },
       })),
-      ...graph.edges.map((edge, i) => ({
+      ...validEdges.map((edge, i) => ({
         data: {
           id: `edge-${i}`,
           source: edge.source,
